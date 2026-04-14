@@ -108,23 +108,6 @@
             margin-top: 2px;
         }
 
-        .poi-info .poi-meta {
-            display: flex;
-            gap: 10px;
-            margin-top: 3px;
-            font-size: 12px;
-        }
-
-        .poi-info .poi-rating {
-            color: #ff8800;
-            font-weight: 500;
-        }
-
-        .poi-info .poi-cost {
-            color: #d32f2f;
-            font-weight: 500;
-        }
-
         .poi-info .poi-type {
             color: #999;
             font-size: 11px;
@@ -385,27 +368,6 @@
                     poiInfo.appendChild(poiType);
                 }
 
-                // 评分和人均消费
-                const rating = poi.biz_ext && poi.biz_ext.rating;
-                const cost = poi.biz_ext && poi.biz_ext.cost;
-                if ((rating && rating !== '[]' && rating !== '0') || (cost && cost !== '[]' && cost !== '0')) {
-                    const meta = document.createElement('div');
-                    meta.className = 'poi-meta';
-                    if (rating && rating !== '[]' && rating !== '0') {
-                        const ratingEl = document.createElement('span');
-                        ratingEl.className = 'poi-rating';
-                        ratingEl.textContent = `★ ${rating}`;
-                        meta.appendChild(ratingEl);
-                    }
-                    if (cost && cost !== '[]' && cost !== '0') {
-                        const costEl = document.createElement('span');
-                        costEl.className = 'poi-cost';
-                        costEl.textContent = `¥${cost}/人`;
-                        meta.appendChild(costEl);
-                    }
-                    poiInfo.appendChild(meta);
-                }
-
                 if (poi.address) {
                     const poiAddr = document.createElement('div');
                     poiAddr.className = 'poi-address';
@@ -469,21 +431,24 @@
                 viewMode: '2D'
             });
 
-            // 先用 PlaceSearch 查找地点（比 Geocoder 更擅长识别景点、商铺等 POI 名称）
+            // 用 PlaceSearch 查找地点，多取几条结果做智能匹配
             const locSearch = new AMap.PlaceSearch({
-                pageSize: 1,
+                pageSize: 10,
                 pageIndex: 1,
                 city: '全国',
-                citylimit: false,
-                extensions: 'all'
+                citylimit: false
             });
 
             locSearch.search(locationName, (status, result) => {
                 if (status === 'complete' && result.poiList && result.poiList.pois.length > 0) {
-                    const poi = result.poiList.pois[0];
-                    const center = poi.location;
-                    const displayName = poi.name || locationName;
-                    const displayAddr = poi.address || '';
+                    const pois = result.poiList.pois;
+                    // 优先选名称包含完整搜索词的结果，排除纯行政区划
+                    const best = pois.find(p => p.name.includes(locationName)) ||
+                                 pois.find(p => p.type && !p.type.includes('地名地址信息')) ||
+                                 pois[0];
+                    const center = best.location;
+                    const displayName = best.name || locationName;
+                    const displayAddr = best.address || '';
                     onLocationFound(AMap, map, center, displayName, displayAddr);
                 } else {
                     // PlaceSearch 没找到，回退到 Geocoder（适合纯地址查询）
@@ -531,7 +496,6 @@
                     pageIndex: 1,
                     city: '全国',
                     citylimit: false,
-                    extensions: 'all',
                     autoFitView: true,
                     map: map
                 });
