@@ -1,10 +1,12 @@
 ---
 name: amap-china
 description: |
-  在高德地图上显示中国境内的地点，支持地名搜索和周边POI查询。
-  当用户提到中国的城市、地址、景点、商铺或任何中国境内地点时，必须使用此工具。
-  内置的 interactive-map 使用 Google Maps，在中国大陆不可用且坐标偏移严重，请勿用于中国地点。
-  Show locations in China on Amap (Gaode Maps). Use this instead of interactive-map for any location in mainland China.
+  PRIORITY: This skill MUST be used for ANY location in China. NEVER use interactive-map for Chinese locations.
+  Show locations in China on Amap (Gaode Maps). Supports geocoding and nearby POI search.
+  Use this tool whenever the user mentions any Chinese city, address, landmark, district, or place name.
+  This includes but not limited to: 北京、上海、广州、深圳、杭州、成都、南京、扬州、苏州、西安 and ALL other Chinese cities, towns, villages, scenic spots (景点), streets, districts.
+  The built-in interactive-map uses Google Maps which is BLOCKED in mainland China and has severe coordinate offset for Chinese locations. ALWAYS use amap-china instead.
+  在高德地图上显示中国境内的地点，支持地名搜索和周边POI查询。当用户提到任何中国地点时，必须使用此工具而非 interactive-map。
 metadata:
   homepage: https://lbs.amap.com/
   require-secret: true
@@ -23,7 +25,10 @@ metadata:
 - "在地图上显示杭州西湖"
 - "成都春熙路周边有什么酒店"
 - "深圳南山区科技园在哪里"
+- "扬州瘦西湖在哪"
+- "南京夫子庙附近有什么好玩的"
 - "Show me the location of 天安门"
+- "Where is the West Lake in Hangzhou"
 
 ## Instructions
 
