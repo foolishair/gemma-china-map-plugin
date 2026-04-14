@@ -36,6 +36,6 @@ Call the `run_js` tool with the following exact parameters:
 
 - script name: `index.html`
 - data: A JSON string with the following fields:
-  - location: The place name or address to search for (e.g. "北京故宫", "上海外滩")
+  - location: The EXACT place name from the user's message. Do NOT simplify, shorten, or translate. Copy the user's original text. For example, "瘦西湖" must stay "瘦西湖", NOT "西湖". "颐和园" must stay "颐和园", NOT "和园".
   - action: Either "locate" to show a location on the map, or "search" to find nearby POIs. Default to "search" if the user asks for nearby places (附近、周边), otherwise use "locate".
   - keyword: (Optional) When action is "search", the type of place to search for (e.g. "咖啡店", "餐厅", "酒店"). If not specified, show general nearby POIs.
