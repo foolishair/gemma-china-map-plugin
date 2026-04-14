@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>高德地图</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        #map-container {
+            width: 100%;
+            height: 55vh;
+        }
+
+        #info-panel {
+            padding: 12px 16px;
+        }
+
+        .location-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 8px;
+        }
+
+        .location-header .pin {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .location-header .name {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .location-header .address {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a73e8;
+            margin: 12px 0 8px;
+        }
+
+        .poi-list {
+            list-style: none;
+        }
+
+        .poi-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .poi-item:last-child {
+            border-bottom: none;
+        }
+
+        .poi-index {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #1a73e8;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .poi-info .poi-name {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .poi-info .poi-address {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .poi-info .poi-distance {
+            font-size: 11px;
+            color: #1a73e8;
+            margin-top: 2px;
+        }
+
+        .poi-info .poi-tel {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .nav-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 6px;
+            padding: 5px 12px;
+            background: #1a73e8;
+            color: #fff;
+            border: none;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .nav-btn:active {
+            background: #1557b0;
+        }
+
+        .nav-btn-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .nav-btn-secondary {
+            background: #fff;
+            color: #1a73e8;
+            border: 1px solid #1a73e8;
+        }
+
+        .nav-btn-secondary:active {
+            background: #e8f0fe;
+        }
+
+        #loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: #888;
+        }
+
+        #loading .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #1a73e8;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #error {
+            text-align: center;
+            padding: 40px 20px;
+            color: #d32f2f;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="map-container"></div>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div>正在加载地图...</div>
+    </div>
+    <div id="error"></div>
+    <div id="info-panel"></div>
+
+    <script>
+        // 非敏感参数从 query string 读取
+        const params = new URLSearchParams(window.location.search);
+        const locationName = params.get('location') || '';
+        const action = params.get('action') || 'locate';
+        const keyword = params.get('keyword') || '';
+
+        // 敏感参数从 hash fragment 读取（不会出现在 HTTP 请求中）
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const apiKey = hashParams.get('key') || '';
+        const securityKey = hashParams.get('security') || '';
+
+        // 读取后立即清除 hash，防止残留
+        if (window.location.hash) {
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+
+        window._AMapSecurityConfig = {
+            securityJsCode: securityKey
+        };
+
+        // HTML 转义，防止 XSS 注入
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // 生成高德导航链接（通用 URI，装了高德 App 会跳转，没装走网页版）
+        function buildNavUrl(lng, lat, name) {
+            const encodedName = encodeURIComponent(name);
+            return `https://uri.amap.com/navigation?to=${lng},${lat},${encodedName}&mode=car&src=amap-china-skill`;
+        }
+
+        // 生成高德标记链接（在高德 App 中查看位置）
+        function buildMarkerUrl(lng, lat, name) {
+            const encodedName = encodeURIComponent(name);
+            return `https://uri.amap.com/marker?position=${lng},${lat}&name=${encodedName}&src=amap-china-skill`;
+        }
+
+        // 创建导航按钮组
+        function createNavButtons(lng, lat, name) {
+            const row = document.createElement('div');
+            row.className = 'nav-btn-row';
+
+            const navLink = document.createElement('a');
+            navLink.className = 'nav-btn';
+            navLink.href = buildNavUrl(lng, lat, name);
+            navLink.target = '_blank';
+            navLink.textContent = '\u{1F697} 导航到这里';
+
+            const openLink = document.createElement('a');
+            openLink.className = 'nav-btn nav-btn-secondary';
+            openLink.href = buildMarkerUrl(lng, lat, name);
+            openLink.target = '_blank';
+            openLink.textContent = '\u{1F4CD} 在高德中打开';
+
+            row.appendChild(navLink);
+            row.appendChild(openLink);
+            return row;
+        }
+
+        function showError(msg) {
+            document.getElementById('loading').style.display = 'none';
+            const errEl = document.getElementById('error');
+            errEl.style.display = 'block';
+            errEl.textContent = msg;
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function renderLocationInfo(name, address, lng, lat) {
+            const panel = document.getElementById('info-panel');
+            panel.innerHTML = '';
+
+            const header = document.createElement('div');
+            header.className = 'location-header';
+
+            const pin = document.createElement('div');
+            pin.className = 'pin';
+            pin.textContent = '\u{1F4CD}';
+
+            const info = document.createElement('div');
+            info.style.flex = '1';
+            const nameEl = document.createElement('div');
+            nameEl.className = 'name';
+            nameEl.textContent = name;
+            info.appendChild(nameEl);
+
+            if (address) {
+                const addrEl = document.createElement('div');
+                addrEl.className = 'address';
+                addrEl.textContent = address;
+                info.appendChild(addrEl);
+            }
+
+            // 导航按钮
+            if (lng && lat) {
+                info.appendChild(createNavButtons(lng, lat, name));
+            }
+
+            header.appendChild(pin);
+            header.appendChild(info);
+            panel.appendChild(header);
+        }
+
+        function renderPOIList(pois, centerName, centerLng, centerLat) {
+            const panel = document.getElementById('info-panel');
+            panel.innerHTML = '';
+
+            // Header
+            const header = document.createElement('div');
+            header.className = 'location-header';
+
+            const pin = document.createElement('div');
+            pin.className = 'pin';
+            pin.textContent = '\u{1F4CD}';
+
+            const headerInfo = document.createElement('div');
+            headerInfo.style.flex = '1';
+            const nameEl = document.createElement('div');
+            nameEl.className = 'name';
+            nameEl.textContent = centerName;
+            const countEl = document.createElement('div');
+            countEl.className = 'address';
+            countEl.textContent = `找到 ${pois.length} 个${keyword || '相关'}结果`;
+
+            headerInfo.appendChild(nameEl);
+            headerInfo.appendChild(countEl);
+
+            // 中心点导航按钮
+            if (centerLng && centerLat) {
+                headerInfo.appendChild(createNavButtons(centerLng, centerLat, centerName));
+            }
+
+            header.appendChild(pin);
+            header.appendChild(headerInfo);
+            panel.appendChild(header);
+
+            // Section title
+            const sectionTitle = document.createElement('div');
+            sectionTitle.className = 'section-title';
+            sectionTitle.textContent = `${keyword || '周边'}搜索结果`;
+            panel.appendChild(sectionTitle);
+
+            // POI list
+            const list = document.createElement('ul');
+            list.className = 'poi-list';
+
+            pois.forEach((poi, i) => {
+                const item = document.createElement('li');
+                item.className = 'poi-item';
+
+                const index = document.createElement('div');
+                index.className = 'poi-index';
+                index.textContent = i + 1;
+
+                const poiInfo = document.createElement('div');
+                poiInfo.className = 'poi-info';
+
+                const poiName = document.createElement('div');
+                poiName.className = 'poi-name';
+                poiName.textContent = poi.name;
+                poiInfo.appendChild(poiName);
+
+                if (poi.address) {
+                    const poiAddr = document.createElement('div');
+                    poiAddr.className = 'poi-address';
+                    poiAddr.textContent = poi.address;
+                    poiInfo.appendChild(poiAddr);
+                }
+
+                if (poi.distance) {
+                    const poiDist = document.createElement('div');
+                    poiDist.className = 'poi-distance';
+                    poiDist.textContent = `距离约 ${poi.distance}米`;
+                    poiInfo.appendChild(poiDist);
+                }
+
+                if (poi.tel) {
+                    const poiTel = document.createElement('div');
+                    poiTel.className = 'poi-tel';
+                    poiTel.textContent = `\u{1F4DE} ${poi.tel}`;
+                    poiInfo.appendChild(poiTel);
+                }
+
+                // 每个 POI 的导航按钮
+                if (poi.location) {
+                    const navLink = document.createElement('a');
+                    navLink.className = 'nav-btn';
+                    navLink.href = buildNavUrl(poi.location.lng, poi.location.lat, poi.name);
+                    navLink.target = '_blank';
+                    navLink.textContent = '\u{1F697} 导航';
+                    navLink.style.marginTop = '6px';
+                    poiInfo.appendChild(navLink);
+                }
+
+                item.appendChild(index);
+                item.appendChild(poiInfo);
+                list.appendChild(item);
+            });
+
+            panel.appendChild(list);
+        }
+
+        // Load Amap JS API
+        const loaderScript = document.createElement('script');
+        loaderScript.src = 'https://webapi.amap.com/loader.js';
+        loaderScript.onload = () => {
+            AMapLoader.load({
+                key: apiKey,
+                version: '2.0',
+                plugins: ['AMap.Geocoder', 'AMap.PlaceSearch', 'AMap.Marker', 'AMap.InfoWindow']
+            }).then(initMap).catch(e => {
+                showError('地图加载失败: ' + e.message);
+            });
+        };
+        loaderScript.onerror = () => {
+            showError('高德地图 SDK 加载失败，请检查网络连接');
+        };
+        document.body.appendChild(loaderScript);
+
+        function initMap(AMap) {
+            const map = new AMap.Map('map-container', {
+                zoom: 15,
+                viewMode: '2D'
+            });
+
+            const geocoder = new AMap.Geocoder({ city: '全国' });
+
+            geocoder.getLocation(locationName, (status, result) => {
+                if (status !== 'complete' || !result.geocodes || result.geocodes.length === 0) {
+                    hideLoading();
+                    showError(`未找到地点: "${locationName}"，请尝试更详细的地址`);
+                    return;
+                }
+
+                const geo = result.geocodes[0];
+                const center = geo.location;
+                const formattedAddress = geo.formattedAddress || locationName;
+
+                map.setCenter(center);
+
+                if (action === 'search') {
+                    doPoiSearch(AMap, map, center, formattedAddress);
+                } else {
+                    hideLoading();
+                    const marker = new AMap.Marker({
+                        position: center,
+                        title: locationName
+                    });
+                    map.add(marker);
+
+                    const safeTitle = escapeHtml(locationName);
+                    const safeAddr = escapeHtml(formattedAddress);
+                    const infoWindow = new AMap.InfoWindow({
+                        content: `<div style="padding:4px 8px;font-size:14px;"><b>${safeTitle}</b><br><span style="font-size:12px;color:#666;">${safeAddr}</span></div>`,
+                        offset: new AMap.Pixel(0, -30)
+                    });
+                    infoWindow.open(map, center);
+
+                    renderLocationInfo(locationName, formattedAddress, center.lng, center.lat);
+                }
+            });
+
+            function doPoiSearch(AMap, map, center, centerName) {
+                const placeSearch = new AMap.PlaceSearch({
+                    pageSize: 15,
+                    pageIndex: 1,
+                    city: '全国',
+                    citylimit: false,
+                    autoFitView: true,
+                    map: map
+                });
+
+                const searchKeyword = keyword || '美食|购物|生活服务';
+
+                placeSearch.searchNearBy(searchKeyword, center, 2000, (status, result) => {
+                    hideLoading();
+
+                    const centerMarker = new AMap.Marker({
+                        position: center,
+                        title: locationName,
+                        icon: 'https://webapi.amap.com/theme/v1.3/markers/n/mark_r.png'
+                    });
+                    map.add(centerMarker);
+
+                    if (status === 'complete' && result.poiList && result.poiList.pois.length > 0) {
+                        renderPOIList(result.poiList.pois, centerName, center.lng, center.lat);
+                    } else {
+                        renderLocationInfo(centerName, `未找到"${keyword || '周边'}"相关结果，已定位到该地点`, center.lng, center.lat);
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>

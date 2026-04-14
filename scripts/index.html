@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amap China Skill</title>
+</head>
+<body>
+    <script>
+        window['ai_edge_gallery_get_result'] = async (data, secret) => {
+            try {
+                const jsonData = JSON.parse(data);
+                const location = jsonData.location;
+                const action = jsonData.action || 'locate';
+                const keyword = jsonData.keyword || '';
+
+                if (!location) {
+                    return JSON.stringify({ error: '请提供地点名称 (location is required)' });
+                }
+
+                if (!secret || !secret.includes('|')) {
+                    return JSON.stringify({
+                        error: '请设置高德地图 API 密钥。格式：API_KEY|SECURITY_KEY。前往 https://console.amap.com/ 获取。'
+                    });
+                }
+
+                const parts = secret.split('|');
+                const apiKey = parts[0].trim();
+                const securityKey = parts[1].trim();
+
+                // 敏感信息放在 hash fragment 中，不会出现在 HTTP 请求、Referrer 头或服务器日志里
+                const queryParams = new URLSearchParams({
+                    location: location,
+                    action: action,
+                    keyword: keyword
+                });
+                const hashParams = new URLSearchParams({
+                    key: apiKey,
+                    security: securityKey
+                });
+
+                const url = `webview.html?${queryParams.toString()}#${hashParams.toString()}`;
+
+                return JSON.stringify({
+                    webview: {
+                        url: url
+                    }
+                });
+            } catch (e) {
+                return JSON.stringify({ error: `高德地图 Skill 错误: ${e.message}` });
+            }
+        };
+    </script>
+</body>
+</html>
