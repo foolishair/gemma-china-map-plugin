@@ -469,42 +469,61 @@
                 viewMode: '2D'
             });
 
-            const geocoder = new AMap.Geocoder({ city: '全国' });
+            // 先用 PlaceSearch 查找地点（比 Geocoder 更擅长识别景点、商铺等 POI 名称）
+            const locSearch = new AMap.PlaceSearch({
+                pageSize: 1,
+                pageIndex: 1,
+                city: '全国',
+                citylimit: false,
+                extensions: 'all'
+            });
 
-            geocoder.getLocation(locationName, (status, result) => {
-                if (status !== 'complete' || !result.geocodes || result.geocodes.length === 0) {
-                    hideLoading();
-                    showError(`未找到地点: "${locationName}"，请尝试更详细的地址`);
-                    return;
+            locSearch.search(locationName, (status, result) => {
+                if (status === 'complete' && result.poiList && result.poiList.pois.length > 0) {
+                    const poi = result.poiList.pois[0];
+                    const center = poi.location;
+                    const displayName = poi.name || locationName;
+                    const displayAddr = poi.address || '';
+                    onLocationFound(AMap, map, center, displayName, displayAddr);
+                } else {
+                    // PlaceSearch 没找到，回退到 Geocoder（适合纯地址查询）
+                    const geocoder = new AMap.Geocoder({ city: '全国' });
+                    geocoder.getLocation(locationName, (status2, result2) => {
+                        if (status2 !== 'complete' || !result2.geocodes || result2.geocodes.length === 0) {
+                            hideLoading();
+                            showError(`未找到地点: "${locationName}"，请尝试更详细的地址`);
+                            return;
+                        }
+                        const geo = result2.geocodes[0];
+                        onLocationFound(AMap, map, geo.location, locationName, geo.formattedAddress || locationName);
+                    });
                 }
+            });
 
-                const geo = result.geocodes[0];
-                const center = geo.location;
-                const formattedAddress = geo.formattedAddress || locationName;
-
+            function onLocationFound(AMap, map, center, name, address) {
                 map.setCenter(center);
 
                 if (action === 'search') {
-                    doPoiSearch(AMap, map, center, formattedAddress);
+                    doPoiSearch(AMap, map, center, name);
                 } else {
                     hideLoading();
                     const marker = new AMap.Marker({
                         position: center,
-                        title: locationName
+                        title: name
                     });
                     map.add(marker);
 
-                    const safeTitle = escapeHtml(locationName);
-                    const safeAddr = escapeHtml(formattedAddress);
+                    const safeTitle = escapeHtml(name);
+                    const safeAddr = escapeHtml(address);
                     const infoWindow = new AMap.InfoWindow({
                         content: `<div style="padding:4px 8px;font-size:14px;"><b>${safeTitle}</b><br><span style="font-size:12px;color:#666;">${safeAddr}</span></div>`,
                         offset: new AMap.Pixel(0, -30)
                     });
                     infoWindow.open(map, center);
 
-                    renderLocationInfo(locationName, formattedAddress, center.lng, center.lat);
+                    renderLocationInfo(name, address, center.lng, center.lat);
                 }
-            });
+            }
 
             function doPoiSearch(AMap, map, center, centerName) {
                 const placeSearch = new AMap.PlaceSearch({
