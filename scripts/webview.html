@@ -15,7 +15,7 @@
 
         #map-container {
             width: 100%;
-            height: 55vh;
+            height: 40vh;
         }
 
         #info-panel {
@@ -105,6 +105,29 @@
         .poi-info .poi-tel {
             font-size: 12px;
             color: #666;
+            margin-top: 2px;
+        }
+
+        .poi-info .poi-meta {
+            display: flex;
+            gap: 10px;
+            margin-top: 3px;
+            font-size: 12px;
+        }
+
+        .poi-info .poi-rating {
+            color: #ff8800;
+            font-weight: 500;
+        }
+
+        .poi-info .poi-cost {
+            color: #d32f2f;
+            font-weight: 500;
+        }
+
+        .poi-info .poi-type {
+            color: #999;
+            font-size: 11px;
             margin-top: 2px;
         }
 
@@ -355,6 +378,34 @@
                 poiName.textContent = poi.name;
                 poiInfo.appendChild(poiName);
 
+                if (poi.type) {
+                    const poiType = document.createElement('div');
+                    poiType.className = 'poi-type';
+                    poiType.textContent = poi.type.split(';')[0];
+                    poiInfo.appendChild(poiType);
+                }
+
+                // 评分和人均消费
+                const rating = poi.biz_ext && poi.biz_ext.rating;
+                const cost = poi.biz_ext && poi.biz_ext.cost;
+                if ((rating && rating !== '[]' && rating !== '0') || (cost && cost !== '[]' && cost !== '0')) {
+                    const meta = document.createElement('div');
+                    meta.className = 'poi-meta';
+                    if (rating && rating !== '[]' && rating !== '0') {
+                        const ratingEl = document.createElement('span');
+                        ratingEl.className = 'poi-rating';
+                        ratingEl.textContent = `★ ${rating}`;
+                        meta.appendChild(ratingEl);
+                    }
+                    if (cost && cost !== '[]' && cost !== '0') {
+                        const costEl = document.createElement('span');
+                        costEl.className = 'poi-cost';
+                        costEl.textContent = `¥${cost}/人`;
+                        meta.appendChild(costEl);
+                    }
+                    poiInfo.appendChild(meta);
+                }
+
                 if (poi.address) {
                     const poiAddr = document.createElement('div');
                     poiAddr.className = 'poi-address';
@@ -461,6 +512,7 @@
                     pageIndex: 1,
                     city: '全国',
                     citylimit: false,
+                    extensions: 'all',
                     autoFitView: true,
                     map: map
                 });
@@ -478,6 +530,9 @@
 
                     if (status === 'complete' && result.poiList && result.poiList.pois.length > 0) {
                         renderPOIList(result.poiList.pois, centerName, center.lng, center.lat);
+                        setTimeout(() => {
+                            document.getElementById('info-panel').scrollIntoView({ behavior: 'smooth' });
+                        }, 300);
                     } else {
                         renderLocationInfo(centerName, `未找到"${keyword || '周边'}"相关结果，已定位到该地点`, center.lng, center.lat);
                     }
