@@ -10,7 +10,7 @@ description: |
 metadata:
   homepage: https://lbs.amap.com/
   require-secret: true
-  require-secret-description: "高德开放平台 API Key 和安全密钥，格式：API_KEY|SECURITY_KEY。前往 https://console.amap.com/ 注册并创建 Web(JS API) 类型的 Key。"
+  require-secret-description: "高德开放平台密钥，格式：JS_API_KEY|SECURITY_KEY|WEB_SERVICE_KEY。前往 https://console.amap.com/ 创建 Web(JS API) 和 Web服务 两种类型的 Key。"
 ---
 
 # 高德地图 (Amap China)
