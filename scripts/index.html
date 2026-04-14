@@ -39,7 +39,9 @@
                     security: securityKey
                 });
 
-                const url = `scripts/webview.html?${queryParams.toString()}#${hashParams.toString()}`;
+                // 基于当前页面路径解析 webview URL（index.html 和 webview.html 同在 scripts/ 目录）
+                const base = window.location.href.replace(/[^/]*$/, '');
+                const url = `${base}webview.html?${queryParams.toString()}#${hashParams.toString()}`;
 
                 return JSON.stringify({
                     webview: {

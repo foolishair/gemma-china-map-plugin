@@ -199,6 +199,12 @@
             history.replaceState(null, '', window.location.pathname + window.location.search);
         }
 
+        if (!apiKey || !securityKey) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent = 'API 密钥缺失，请在 AI Edge Gallery 中重新设置密钥（格式：API_KEY|SECURITY_KEY）';
+        }
+
         window._AMapSecurityConfig = {
             securityJsCode: securityKey
         };
@@ -466,8 +472,7 @@
 
                     const centerMarker = new AMap.Marker({
                         position: center,
-                        title: locationName,
-                        icon: 'https://webapi.amap.com/theme/v1.3/markers/n/mark_r.png'
+                        title: locationName
                     });
                     map.add(centerMarker);
 
